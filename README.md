@@ -1,37 +1,69 @@
 # lex-temporal
 
-Temporal perception and time reasoning for LegionIO's cognitive architecture.
+Temporal perception and time management for LegionIO cognitive agents. Tracks elapsed time, deadlines, subjective time dilation, and recurring event patterns.
 
-## Overview
+## What It Does
 
-Models the brain's time perception mechanisms — elapsed awareness, temporal urgency, pattern detection, deadline tracking, and subjective time dilation. Without temporal awareness, the agent treats a 5-second-old event identically to a 5-hour-old one.
+`lex-temporal` gives cognitive agents a sense of time. It records when events happen, measures how long ago they occurred, tracks deadlines with urgency scoring, models how arousal and cognitive load warp subjective time perception, and identifies whether recurring events are periodic, bursty, irregular, or sparse.
 
-## Components
-
-- **TimePerception**: Tracks elapsed time since events, computes temporal urgency, detects overdue items
-- **TemporalPattern**: Recognizes recurring temporal patterns (circadian, periodic, bursty)
-- **TemporalStore**: Manages event timestamps, deadlines, and temporal pattern history
-
-## Installation
-
-```ruby
-gem 'legion-extensions-temporal'
-```
+- **Event timing**: per-domain, per-event timestamp history
+- **Deadlines**: up to 50 deadlines with urgency scoring (overdue through far_future)
+- **Subjective dilation**: `dilation` factor 0.5–2.0, updated via EMA from arousal + cognitive load
+- **Pattern detection**: periodic (CV < 0.3), bursty (clustered intervals), irregular, sparse
+- **Next-event prediction**: confidence-scored estimates based on pattern type
 
 ## Usage
 
 ```ruby
+require 'legion/extensions/temporal'
+
 client = Legion::Extensions::Temporal::Client.new
 
-# Mark an event
-client.mark_event(event: :task_completed, domain: :deployment)
+# Mark events
+client.mark_event(domain: :coding, event: :commit)
+# => { count: 1, elapsed_since: nil }
 
-# Check elapsed time
-client.elapsed_since(event: :task_completed)
+sleep 5
+
+client.mark_event(domain: :coding, event: :commit)
+# => { count: 2, elapsed_since: 5.0 }
+
+# Elapsed time with humanized format
+client.elapsed_since(domain: :coding, event: :commit)
+# => { seconds: 5.0, humanized: '5s' }
 
 # Set a deadline
-client.set_deadline(id: :release, at: Time.now + 3600)
+client.set_deadline(
+  id: 'sprint_end',
+  at: Time.now + 3600,
+  description: 'Sprint closes'
+)
 
-# Get temporal urgency
-client.temporal_urgency
+# Check deadlines
+client.check_deadlines
+# => { overdue: [], upcoming: [{ id: 'sprint_end', urgency: 0.05 }], urgency: 0.05 }
+
+# Predict next occurrence based on pattern
+client.predict_event(domain: :coding, event: :commit)
+# => { predicted_at: ..., confidence: 0.8 }
+
+# Per-tick update (reads arousal + cognitive_load from tick_results)
+client.update_time_perception(tick_results: tick_output)
+# => { dilation: 1.2, urgency: 0.05 }
+
+# Temporal stats
+client.temporal_stats
+# => { total_events_tracked:, deadlines_count:, active_patterns:, current_dilation: }
 ```
+
+## Development
+
+```bash
+bundle install
+bundle exec rspec
+bundle exec rubocop
+```
+
+## License
+
+MIT
